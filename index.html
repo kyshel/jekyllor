@@ -8,7 +8,8 @@
 <body>
 
 <div id="show"></div>
-<div id="show2"></div>
+
+<div id="sec_auth"></div>
 
 <div id="file_list"></div>
 <div id="file_content"></div>
@@ -35,11 +36,36 @@
     	return decodeURIComponent(escape(window.atob( str )));
 	}
 
+	function createCookie(name,value,days) {
+		if (days) {
+			var date = new Date();
+			date.setTime(date.getTime()+(days*24*60*60*1000));
+			var expires = "; expires="+date.toGMTString();
+		}
+		else var expires = "";
+		document.cookie = name+"="+value+expires+"; path=/";
+	}
+
+	function readCookie(name) {
+		var nameEQ = name + "=";
+	    var ca = document.cookie.split(';');
+	    for(var i=0;i < ca.length;i++) {
+	        var c = ca[i];
+	        while (c.charAt(0)==' ') c = c.substring(1,c.length);
+	        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+	    }
+	    return null;
+	}
+
+	function eraseCookie(name) {
+	    createCookie(name,"",-1);
+	}
+
 
 	function show_response(data_obj){
 		//console.log(data_obj);
 		data_string=JSON.stringify(data_obj, null, 4)
-		$("#show2").html('<pre>'+data_string+'</pre>');
+		$("#show").html('<pre>'+data_string+'</pre>');
 	}
 
 	function clog(obj,obj_name = "obj_name_not_define"){
@@ -106,8 +132,10 @@
 			clog(response,'response');
 			console.log(xhr);	
 
-			file_list='<button onclick="renderEditor(\'create\',this.value)" value="'+link+'">Add new post</button><br>';
-			file='';
+			var file='';
+			var file_list='<button onclick="logout()" value="'+link+'">Logout</button><br>';
+			file_list+='<button onclick="renderEditor(\'create\',this.value)" value="'+link+'">Add new post</button><br>';
+			
 			for (file_index in response){
 				//console.log(file_index+':'+response[file_index].name);
 				file=response[file_index];
@@ -121,6 +149,7 @@
 
 			$("#file_list").html(file_list);
 
+			$('#sec_auth').html('');
 			$('#file_editor').hide();
 			$('#file_content').hide();
 			$('#file_list').show();	
@@ -132,6 +161,7 @@
 
 	function renderEditor(act,path){
 		var func='';
+		var is_readonly='';
 		var file_name='';
 		var file_content='';
 		var file=getFile(path);
@@ -147,15 +177,17 @@
 				break;
 			case 'update':
 				func="runUpdate('"+path+"')";
+				is_readonly="readonly";
 				break;
 			default:
 				alert('An Error occured!');
 		}
 
-		var file_editor='Filename:<input id="file_name" value="'+file_name+'">';
+		var file_editor='Filename:<input id="file_name" value="'+file_name+'" '+is_readonly+'>';
 		file_editor+='Content:<input id="input_editor" value="">';
 		file_editor+='Commit message:<input id="commit_message">';
-		file_editor+='<button id="commit_message" onclick="'+func+'">Submit</button>';
+		file_editor+='<button id="commit_message" onclick="'+func+'">Submit</button> &nbsp; ';
+		file_editor+='<button onclick="getFileList(this.value)" value="'+link+'">Cancel</button>';
 
 		$('#file_editor').html(file_editor);
 		$('#input_editor').val(b64_to_utf8(file_content) );
@@ -305,11 +337,28 @@
 			status_text=xhr.statusText;
 			getFileList(link);
 
-
-
 		}).error( function(e) {
-			//console.log(e.status);
 		});
+	}
+
+
+	function renderAuth() {
+		var sec_auth='Enter your token:<input id="token">'
+		sec_auth+= '<button onclick="auth(this.value)" value="'+link+'"> Submit </button>'
+		$("#sec_auth").html(sec_auth)
+	}
+
+	function auth(){
+		clog($("#token").val())
+		createCookie('token',$("#token").val(),1);
+		load()
+	}
+
+	function logout(){
+		eraseCookie('token')
+
+		$('#file_list').html('');
+		renderAuth()
 	}
 
 
@@ -317,19 +366,39 @@
 
 
 
-
 	datetime = "Synctime : " + new Date().today() + " @ " + new Date().timeNow();
+	link = 'https://api.github.com/repos/kslib/repo_s/contents/_posts';
+
+	// var user={
+	// 	token ='';
+	// };
+
+	function load(){
+		token = readCookie('token')
+		getFileList(link);
+	}
+
+	var token ='';
+
+	clog(readCookie('token'));
+
+	if (!readCookie('token') ) {
+		clog('lllla');
+		renderAuth()
+	}else{		
+		load()	
+	}
+	
 	
 
-	link = 'https://api.github.com/repos/kslib/repo_s/contents/_posts';
-	//link = 'https://api.github.com/repos/kslib/repo_s/contents/_posts/file_01.php?ref=master';
+	// datetime = "Synctime : " + new Date().today() + " @ " + new Date().timeNow();
+	// link = 'https://api.github.com/repos/kslib/repo_s/contents/_posts';
 
-	commit_message = 'this is commit message';
-	commit_content = datetime + '\n lalala ' ;
+	// commit_message = 'this is commit message';
+	// commit_content = datetime + '\n lalala ' ;
+	// commit_content_encoded =utf8_to_b64(commit_content);
 
-	commit_content_encoded =utf8_to_b64(commit_content);
-
-	getFileList(link);
+	//getFileList(link);
 	//getFile(link);
 	//createFile(link,commit_message,commit_content_encoded);
 	//updateFile(link,commit_message,commit_content_encoded); 
