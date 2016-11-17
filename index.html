@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>or</title>
+	<meta charset="utf-8">
+
+</head>
+<body>
+
+<div id="show"></div>
+<div id="show2"></div>
+
+<div id="file_list"></div>
+<div id="file_content"></div>
+<div id="file_editor"></div>
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+<script type="text/javascript">
+
+	Date.prototype.today = function () { 
+	    return this.getFullYear() + "-" +(((this.getMonth()+1) < 10)?"0":"") + (this.getMonth()+1) + ((this.getDate() < 10)?"0":"") + this.getDate() ;
+	}
+
+	Date.prototype.timeNow = function () {
+	     return ((this.getHours() < 10)?"0":"") + this.getHours() +":"+ ((this.getMinutes() < 10)?"0":"") + this.getMinutes() +":"+ ((this.getSeconds() < 10)?"0":"") + this.getSeconds();
+	}
+
+	function utf8_to_b64( str ) { 
+		return window.btoa(unescape(encodeURIComponent( str )));
+	}
+
+
+	function b64_to_utf8( str ) {
+    	str = str.replace(/\s/g, '');    
+    	return decodeURIComponent(escape(window.atob( str )));
+	}
+
+
+	function show_response(data_obj){
+		//console.log(data_obj);
+		data_string=JSON.stringify(data_obj, null, 4)
+		$("#show2").html('<pre>'+data_string+'</pre>');
+	}
+
+	function clog(obj,obj_name = "obj_name_not_define"){
+			console.log(obj_name+':>>>>>>>');
+			console.log(obj);
+			console.log(obj_name+':<<<<<<<');
+	}
+
+	function getSha(path) {
+		sha = '';
+		$.ajax({
+			url: path,
+			type: 'GET',
+			beforeSend: function(xhr) { 
+      			xhr.setRequestHeader("Authorization", "token "+token); 
+			},
+			async:false, // compromise
+		}).success( function(response,status,xhr) {			
+			//show_response(response);
+			sha=response.sha;
+		}).error( function(e) {
+
+		});
+
+		return sha;
+	}
+
+	function getFile(path) {
+		var file = {
+			name : "",
+			content : "",
+			sha : ""
+		};
+		$.ajax({
+			url: path,
+			type: 'GET',
+			beforeSend: function(xhr) { 
+      			xhr.setRequestHeader("Authorization", "token "+token); 
+			},
+			async:false, // compromise
+		}).success( function(response,status,xhr) {			
+			//show_response(response);
+			file.name=response.name;
+			file.content=response.content;
+			file.sha=response.sha;
+		}).error( function(e) {
+
+		});
+
+		return file;
+	}
+
+	function getFileList(path) {
+		path+="?sid="+Math.random(); // prevent cache		
+		$.ajax({
+			url: path,
+			type: 'GET',
+			beforeSend: function(xhr) { 
+      			xhr.setRequestHeader("Authorization", "token "+token); 
+			},
+
+			//dataType: 'jsonp'
+		}).success( function(response,status,xhr) {
+			clog(response,'response');
+			console.log(xhr);	
+
+			file_list='<button onclick="renderEditor(\'create\',this.value)" value="'+link+'">Add new post</button><br>';
+			file='';
+			for (file_index in response){
+				//console.log(file_index+':'+response[file_index].name);
+				file=response[file_index];
+
+				file_list+='<a href="'+file.html_url+'">'+file.name+'</a>';
+				file_list+='<button onclick="renderFile(this.value)" value="'+file._links.self+'">Read</button>';
+				file_list+='<button onclick="renderEditor(\'update\',this.value)" value="'+file._links.self+'" >Edit</button>';
+				file_list+='<button onclick="confirmDelete(this.value,\''+file.name+'\')" value="'+file._links.self+'">Delete</button>';
+				file_list+='<br>';
+			}
+
+			$("#file_list").html(file_list);
+
+			$('#file_editor').hide();
+			$('#file_content').hide();
+			$('#file_list').show();	
+
+		}).error( function(e) {
+		});
+
+	}
+
+	function renderEditor(act,path){
+		var func='';
+		var file_name='';
+		var file_content='';
+		var file=getFile(path);
+
+		if (act == 'update') {
+			file_name = file.name;
+			file_content = file.content;
+		}
+
+		switch(act){
+			case 'create':
+				func="runCreate('"+path+"')";
+				break;
+			case 'update':
+				func="runUpdate('"+path+"')";
+				break;
+			default:
+				alert('An Error occured!');
+		}
+
+		var file_editor='Filename:<input id="file_name" value="'+file_name+'">';
+		file_editor+='Content:<input id="input_editor" value="">';
+		file_editor+='Commit message:<input id="commit_message">';
+		file_editor+='<button id="commit_message" onclick="'+func+'">Submit</button>';
+
+		$('#file_editor').html(file_editor);
+		$('#input_editor').val(b64_to_utf8(file_content) );
+		$('#file_list').hide();
+		$('#file_editor').show();	
+	}
+
+	function runCreate(path){
+		var new_file_name = $('#file_name').val();
+
+		var new_file_path = path + '/' +new_file_name ;
+		var message = $('#commit_message').val();
+		var content = $('#input_editor').val();
+
+		createFile(new_file_path,message,utf8_to_b64(content));
+	}
+
+	function runUpdate(path){
+		var message = $('#commit_message').val();
+		var content = $('#input_editor').val();
+
+		clog(path)	
+
+		updateFile(path,message,utf8_to_b64(content));
+	}
+
+
+
+	function confirmDelete(path,name){
+		console.log('confirmDelete():'+path);
+		var delete_message = prompt("Are you sure to delete this file?", "Delete "+name);
+		var re= /[ \t]/g; // check space and tab
+		if (delete_message === "" || re.test(delete_message) ) {
+			deleteFile(path,delete_message);
+			
+		} else if (delete_message) {
+			console.log('bingo');
+		} 
+
+		console.log(delete_message);
+		
+	}
+
+	function renderFile(path) {
+		var file = getFile(path);
+
+		var file_content='';
+		file_content+='<button onclick="getFileList(this.value)" value="'+link+'"> << Back To Posts</button>';
+		file_content+='<h3>'+file.name+'</h3>';
+		file_content+='<pre>'+b64_to_utf8(file.content)+'</pre>';
+
+		//$('#file_editor').hide();
+		$('#file_list').hide();
+		$('#file_content').show();
+
+		$('#file_content').html(file_content);	
+
+
+	}
+
+
+	function createFile(path,message,content) {
+		input =	
+		{
+			"message": message,
+			"content": content
+		};
+
+		$.ajax({
+			url: path,
+			type: 'PUT',
+			beforeSend: function(xhr) { 
+      			xhr.setRequestHeader("Authorization", "token "+token); 
+			},
+			data: JSON.stringify(input),
+		}).success( function(response,status,xhr) {
+			console.log(xhr);
+			status_code=xhr.status;
+			status_text=xhr.statusText;
+			if (status_code = 201) {
+				getFileList(link);
+			}else{
+				alert('Error occured!');
+			}
+
+		}).error( function(e) {
+			//console.log(e.status);
+		});
+	}
+
+
+
+	function updateFile(path,message,content){
+
+		input =	
+		{
+			"message": message,
+			"content": content,
+			"sha":getSha(path)
+		};
+
+		console.log(input.sha);
+		$.ajax({
+			url: path,
+			type: 'PUT',
+			beforeSend: function(xhr) { 
+      			xhr.setRequestHeader("Authorization", "token "+token); 
+			},
+
+			data: JSON.stringify(input),
+
+		}).success( function(response,status,xhr) {
+			console.log(xhr);
+			status_code=xhr.status;
+			status_text=xhr.statusText;
+			if (status_code = 201) {
+				getFileList(link);
+			}else{
+				alert('Error occured!');
+			}
+		}).error( function(e) {
+			//console.log(e.status);
+		});
+	}
+
+	function deleteFile(path,message) {
+		input =	
+		{
+			"message": message,
+			"sha": getSha(path)
+		};
+
+		$.ajax({
+			url: path,
+			type: 'DELETE',
+			beforeSend: function(xhr) { 
+      			xhr.setRequestHeader("Authorization", "token "+token); 
+			},
+
+			data: JSON.stringify(input),
+		}).success( function(response,status,xhr) {
+			//show_response(response);
+
+			console.log(xhr);
+			console.log(xhr.getAllResponseHeaders());
+			status_code=xhr.status;
+			status_text=xhr.statusText;
+			getFileList(link);
+
+
+
+		}).error( function(e) {
+			//console.log(e.status);
+		});
+	}
+
+
+
+
+
+
+
+	datetime = "Synctime : " + new Date().today() + " @ " + new Date().timeNow();
+	
+
+	link = 'https://api.github.com/repos/kslib/repo_s/contents/_posts';
+	//link = 'https://api.github.com/repos/kslib/repo_s/contents/_posts/file_01.php?ref=master';
+
+	commit_message = 'this is commit message';
+	commit_content = datetime + '\n lalala ' ;
+
+	commit_content_encoded =utf8_to_b64(commit_content);
+
+	getFileList(link);
+	//getFile(link);
+	//createFile(link,commit_message,commit_content_encoded);
+	//updateFile(link,commit_message,commit_content_encoded); 
+	//deleteFile(link2,commit_message);
+
+	
+
+
+
+
+
+
+</script>
+
+</body>
+</html>
