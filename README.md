@@ -21,7 +21,7 @@ Jekyllor provide a simple way to do this.
 
 
 ## Credits
-Made with ❤ by kyshel
+Made with ❤ by kyshel  
 MIT License
 
 
