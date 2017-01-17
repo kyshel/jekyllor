@@ -183,11 +183,12 @@
 				alert('An Error occured!');
 		}
 
-		var file_editor='Filename:<input id="file_name" value="'+file_name+'" '+is_readonly+'>';
-		file_editor+='Content:<input id="input_editor" value="">';
-		file_editor+='Commit message:<input id="commit_message">';
+		var file_editor='Filename:<input id="file_name" value="'+file_name+'" '+is_readonly+' style="width:200px;">';
+		file_editor+='<br>Content:<br><textarea id="input_editor" value="" style="width:500px;height:500px;"></textarea>';
+		file_editor+='<br>Commit message:<input id="commit_message">';
 		file_editor+='<button id="commit_message" onclick="'+func+'">Submit</button> &nbsp; ';
 		file_editor+='<button onclick="getFileList(this.value)" value="'+link+'">Cancel</button>';
+
 
 		$('#file_editor').html(file_editor);
 		$('#input_editor').val(b64_to_utf8(file_content) );
@@ -361,24 +362,38 @@
 		renderAuth()
 	}
 
+	function getLink(token) {
 
+		var link= '';
 
+		$.ajax({
+			url: 'https://api.github.com/user',
+			type: 'GET',
+			beforeSend: function(xhr) { 
+      			xhr.setRequestHeader("Authorization", "token "+token); 
+			},
+			async:false, // compromise
+		}).success( function(response,status,xhr) {			
+			//show_response(response);
+			console.log('this is reponse . login: '+response.login);
+			link = 'https://api.github.com/repos/'+response.login+'/'+response.login+'.github.io/contents/_posts';
+		}).error( function(e) {
 
+		});
 
+		return link;
+	}
 
-	datetime = "Synctime : " + new Date().today() + " @ " + new Date().timeNow();
-	link = 'https://api.github.com/repos/kslib/repo_s/contents/_posts';
-
-	// var user={
-	// 	token ='';
-	// };
 
 	function load(){
 		token = readCookie('token')
+		link = getLink(token)
 		getFileList(link);
 	}
 
 	var token ='';
+	var datetime = "Synctime : " + new Date().today() + " @ " + new Date().timeNow();
+	var link = '';
 
 	clog(readCookie('token'));
 
